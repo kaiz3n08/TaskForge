@@ -1,5 +1,5 @@
 import { type FastifyInstance } from "fastify";
-import { QueueingJobs } from "./queue";
+import { enqueue } from "./queue";
 
 const jobSchema = {
   schema: {
@@ -26,9 +26,14 @@ type data = {
 export function jobRoutes(fastify: FastifyInstance) {
   fastify.get("/jobs", async (req , res) => { res.send("jobs") })
   fastify.post("/job", jobSchema , async (req, res) => {
-    const { data } = req.body as data;
-    QueueingJobs({data});
-    res.send("job pst")
+    try {
+      const { data } = req.body as data;
+      const JobId = await enqueue({ data });
+
+       res.status(201).send(`JobId : ${JobId}, It is Queued`)
+    } catch (err) {
+      res.status(500).send(`Internal Server Error: ${err}`)
+    }
   })
   fastify.get("/job/:id", async (req, res) => { res.send("jobs sear") })
   fastify.delete("/job/:id", async (req, res) => { res.send("job s") })
