@@ -1,7 +1,4 @@
-import { RedisClient } from "bun";
-
-const redisUrl = process.env.REDIS_URL
-const redis = new RedisClient(redisUrl);
+import redis from "./redis";
 
 type jobRequest = {
   data: {
@@ -10,7 +7,7 @@ type jobRequest = {
     priority: boolean
   }
 }
-interface Job{
+export interface Job{
   id: string,
   userId: string,
   type: string,

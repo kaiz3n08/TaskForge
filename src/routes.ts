@@ -30,7 +30,8 @@ export function jobRoutes(fastify: FastifyInstance) {
       const { data } = req.body as data;
       const JobId = await enqueue({ data });
 
-       res.status(201).send(`JobId : ${JobId}, It is Queued`)
+      res.status(201).send(`JobId : ${JobId}, It is Queued`);
+
     } catch (err) {
       res.status(500).send(`Internal Server Error: ${err}`)
     }

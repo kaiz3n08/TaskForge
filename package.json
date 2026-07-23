@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun server.ts"
+    "dev": "bun server.ts",
+    "worker": "bun src/worker/worker.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
