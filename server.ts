@@ -7,5 +7,5 @@ const port = Number(process.env.PORT);
 fastify.register( jobRoutes , {prefix : "v1/"})
 
 fastify.listen({port}, () => {
-  console.log(`Listening on ${port}`);
+  console.log(`listening on ${port}`);
 })

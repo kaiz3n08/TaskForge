@@ -5,16 +5,21 @@
   "private": true,
   "scripts": {
     "dev": "bun server.ts",
-    "worker": "bun src/worker/worker.ts"
+    "worker": "bun src/worker/worker.ts",
+    "migrate": "bunx prisma migrate dev"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "prisma": "^7.9.0"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.9.0",
+    "@prisma/client": "^7.9.0",
     "dotenv": "^17.4.2",
-    "fastify": "^5.10.0"
+    "fastify": "^5.10.0",
+    "pg": "^8.22.0"
   }
 }

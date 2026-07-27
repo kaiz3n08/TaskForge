@@ -1,46 +1,64 @@
 import redis from "./redis";
+import { prisma } from "../prisma/lib/prismaClient";
+import { Prisma } from "../generated/prisma/client";
 
 type jobRequest = {
   data: {
-    jobType: string,
-    payload: object,
-    priority: boolean
-  }
+    jobType: string;
+    payload: object;
+    priority: boolean;
+  };
+};
+export interface Job {
+  id: string;
+  userId: string;
+  type: string;
+  payload: unknown;
+  priority: boolean;
+
 }
-export interface Job{
-  id: string,
-  userId: string,
-  type: string,
-  payload: unknown,
-  priority: boolean,
-  createdAt: number
-}
-export async function enqueue(job: jobRequest) {
+export async function enqueue(job: jobRequest, userId: string) {
   const priority = job.data.priority ?? false;
   const id = crypto.randomUUID();
-  const newJob : Job = {
+  const newJob: Job = {
     id,
-    userId: "123",
-    type:job.data.jobType,
+    userId,
+    type: job.data.jobType,
     payload: job.data.payload,
     priority,
-    createdAt : Date.now()
+  };
+  try {
+    await prisma.jobs.create({
+      data: {
+        id: newJob.id,
+        type: newJob.type,
+        payload: newJob.payload as Prisma.InputJsonValue,
+        userID: newJob.userId,
+        priority: newJob.priority,
+      },
+    });
+  } catch (err) {
+    throw Error(`Database insertion error :${err}`);
   }
-  const jsonJob = JSON.stringify(newJob)
+
+  const jsonJob = JSON.stringify(newJob);
   if (priority) {
     try {
-      await redis.lpush('forge:queue:priority', jsonJob);
+      await redis.lpush("forge:queue:priority", jsonJob);
       return newJob.id;
     } catch (err) {
-      throw new Error(`Error While queueing Job:${newJob.id} \n error : ${err}`);
+      throw new Error(
+        `Error While queueing Job:${newJob.id} \n error : ${err}`,
+      );
     }
-  }
-  else {
+  } else {
     try {
-          await redis.lpush('forge:queue:normal', jsonJob);
-          return newJob.id;
-        } catch (err) {
-          throw new Error(`Error While queueing Job:${newJob.id} \n error : ${err}`);
-        }
+      await redis.lpush("forge:queue:normal", jsonJob);
+      return newJob.id;
+    } catch (err) {
+      throw new Error(
+        `Error While queueing Job:${newJob.id} \n error : ${err}`,
+      );
+    }
   }
 }

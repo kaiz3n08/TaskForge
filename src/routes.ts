@@ -27,9 +27,14 @@ export function jobRoutes(fastify: FastifyInstance) {
   fastify.get("/jobs", async (req , res) => { res.send("jobs") })
   fastify.post("/job", jobSchema , async (req, res) => {
     try {
+      const userId = req.headers["x-userid"] as string;
+      if (!userId) {
+        return res.status(400).send({
+          msg: "userid not found , kindly add it!",
+        });
+      }
       const { data } = req.body as data;
-      const JobId = await enqueue({ data });
-
+      const JobId = await enqueue({ data }, userId);
       res.status(201).send(`JobId : ${JobId}, It is Queued`);
 
     } catch (err) {
