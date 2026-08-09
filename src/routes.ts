@@ -1,7 +1,9 @@
 import { type FastifyInstance } from "fastify";
 import { enqueue } from "./queue";
+import { searchId } from "./helper/search";
 import { prisma } from "../prisma/lib/prismaClient";
 import { Status } from "../generated/prisma/enums";
+
 const jobSchema = {
   schema: {
     body: {
@@ -50,12 +52,12 @@ export function jobRoutes(fastify: FastifyInstance) {
       });
     }
     const { id } = req.params;
-    const job = await prisma.jobs.findFirst({
-      where: {
-        id,
-        userID: userId,
-      },
-    });
+    if (!id) {
+      return res.status(404).send({
+        msg: "Id is not provided in parameters!",
+      });
+    }
+    const job = await searchId(id, userId)
     if (job?.userID != userId) {
       return res.status(403).send({
         error: "Wrong user id!",
@@ -73,7 +75,53 @@ export function jobRoutes(fastify: FastifyInstance) {
       updatedAt: job.UpdatedAt,
     });
   });
-  fastify.delete("/job/:id", async (req, res) => {
-    res.send("job s");
-  });
+  fastify.delete<{ Params: { id: string } }>(
+    "/job/cancel/:id",
+    async (req, res) => {
+      const userId = req.headers["x-userid"] as string;
+      const { id } = req.params;
+      console.log(userId);
+      if (!userId) {
+        return res.status(400).send({
+          msg: "userid not found , kindly add it!",
+        });
+      }
+      if (!id) {
+        return res.status(409).send({
+          msg: "Id is not provided in parameters!",
+        });
+      }
+      const job = await searchId(id, userId);
+
+      if (!job) {
+        return res.status(400).send({
+          msg: "job not found!",
+        });
+      }
+
+      if (job?.status === "ACTIVE") {
+        return res.status(406).send({
+          msg: "Job is active can't be deleted",
+        });
+      }
+
+      if (job?.status === "CANCELLED") {
+        return res.status(409).send({
+          msg: "Job is CANCELLED already!",
+        });
+      }
+
+      const updateJobStatus = await prisma.jobs.update({
+        where: {
+          id: id,
+        },
+        data: {
+          status: "CANCELLED",
+        },
+      });
+      return res.status(200).send({
+        msg: `CANCELLED job : ${updateJobStatus.id}`,
+      });
+    },
+  )
 }

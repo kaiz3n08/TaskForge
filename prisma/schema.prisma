@@ -32,5 +32,6 @@ enum Status {
   ACTIVE
   COMPLETED
   FAILED
+  CANCELLED
   }
 
