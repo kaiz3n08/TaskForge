@@ -2,7 +2,6 @@ import { type FastifyInstance } from "fastify";
 import { enqueue } from "./queue";
 import { searchId } from "./helper/search";
 import { prisma } from "../prisma/lib/prismaClient";
-import { Status } from "../generated/prisma/enums";
 
 const jobSchema = {
   schema: {
@@ -80,7 +79,6 @@ export function jobRoutes(fastify: FastifyInstance) {
     async (req, res) => {
       const userId = req.headers["x-userid"] as string;
       const { id } = req.params;
-      console.log(userId);
       if (!userId) {
         return res.status(400).send({
           msg: "userid not found , kindly add it!",

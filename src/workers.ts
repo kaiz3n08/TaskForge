@@ -1,4 +1,5 @@
 import redis from "./redis";
+import { prisma } from "../prisma/lib/prismaClient";
 
 export async function worker() {
   while (true) {
@@ -8,6 +9,26 @@ export async function worker() {
       0,
     );
     const JsonJob = JSON.parse(RemovedJob?.[1] as string);
-    console.log(`JobId : ${JsonJob.id} is completed! `);
+
+    await prisma.jobs.update({
+      where: {
+        id: JsonJob.id,
+      },
+      data: {
+        status: "ACTIVE",
+      },
+    });
+    console.log(`Job ${JsonJob?.id} is processing`);
+
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await prisma.jobs.update({
+      where: {
+        id: JsonJob.id,
+      },
+      data: {
+        status: "COMPLETED",
+      },
+    });
+    console.log(`Job ${JsonJob?.id} is COMPLETED`);
   }
 }
