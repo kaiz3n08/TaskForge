@@ -26,7 +26,22 @@ type data = {
 }
 
 export function jobRoutes(fastify: FastifyInstance) {
-  fastify.get("/jobs", async (req , res) => { res.send("jobs") })
+  fastify.get("/jobs", async (req, res) => {
+    const userid = req.headers["x-userid"] as string;
+    if (!userid) {
+      return res.status(404).send({
+        msg: "No user id found",
+      });
+    }
+    const allJobs = await prisma.jobs.findMany({
+      where: {
+        userID: userid,
+      },
+    });
+    return res.status(200).send({
+      YourJobs: allJobs,
+    });
+  });
   fastify.post("/job", jobSchema , async (req, res) => {
     try {
       const userId = req.headers["x-userid"] as string;
