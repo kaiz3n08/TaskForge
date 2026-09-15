@@ -1,4 +1,4 @@
-import redis from "./redis";
+import { rediss } from "./redis";
 import { prisma } from "../prisma/lib/prismaClient";
 import { Prisma } from "../generated/prisma/client";
 
@@ -44,7 +44,7 @@ export async function enqueue(job: jobRequest, userId: string) {
   const jsonJob = JSON.stringify(newJob);
   if (priority) {
     try {
-      await redis.lpush("forge:queue:priority", jsonJob);
+      await rediss.lpush("forge:queue:priority", jsonJob);
       return newJob.id;
     } catch (err) {
       throw new Error(
@@ -53,7 +53,7 @@ export async function enqueue(job: jobRequest, userId: string) {
     }
   } else {
     try {
-      await redis.lpush("forge:queue:normal", jsonJob);
+      await rediss.lpush("forge:queue:normal", jsonJob);
       return newJob.id;
     } catch (err) {
       throw new Error(

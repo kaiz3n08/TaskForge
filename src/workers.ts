@@ -1,9 +1,9 @@
-import redis from "./redis";
+import { rediss } from "./redis";
 import { prisma } from "../prisma/lib/prismaClient";
 
 export async function worker() {
   while (true) {
-    const RemovedJob = await redis.brpop(
+    const RemovedJob = await rediss.brpop(
       "forge:queue:priority",
       "forge:queue:normal",
       0,
@@ -20,7 +20,7 @@ export async function worker() {
     });
     console.log(`Job ${JsonJob?.id} is processing`);
 
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await new Promise((resolve) => setTimeout(resolve, 15000));
     await prisma.jobs.update({
       where: {
         id: JsonJob.id,
