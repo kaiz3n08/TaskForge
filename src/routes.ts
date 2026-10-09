@@ -26,7 +26,9 @@ type data = {
 }
 
 export function jobRoutes(fastify: FastifyInstance) {
+
   fastify.get("/jobs", async (req, res) => {
+
     const userid = req.headers["x-userid"] as string;
     if (!userid) {
       return res.status(404).send({
@@ -71,7 +73,7 @@ export function jobRoutes(fastify: FastifyInstance) {
         msg: "Id is not provided in parameters!",
       });
     }
-    const job = await searchId(id, userId)
+    const job = await searchId(userId, id)
     if (job?.userID != userId) {
       return res.status(403).send({
         error: "Wrong user id!",
@@ -104,7 +106,7 @@ export function jobRoutes(fastify: FastifyInstance) {
           msg: "Id is not provided in parameters!",
         });
       }
-      const job = await searchId(id, userId);
+      const job = await searchId(userId, id);
 
       if (!job) {
         return res.status(400).send({
@@ -137,4 +139,48 @@ export function jobRoutes(fastify: FastifyInstance) {
       });
     },
   )
+
+  const server = Bun.serve({
+    routes: {
+      "/live/:id": async (req) => {
+        const userId = req.headers.get("user-id") as string;
+        const jobId: string = req.params.id;
+        if (!userId) {
+          return Response.json("No userid provided", { status: 400 });
+        }
+        const userCheck = await searchId(userId, jobId);
+        if (!userCheck) {
+          return Response.json(
+            {
+              err: "Invalid credentials",
+            },
+            { status: 404 },
+          );
+        }
+        server.upgrade(req, {
+          data: {
+            userId,
+            jobId,
+          },
+        });
+      },
+    },
+    port: Number(process.env.WS_PORT),
+    fetch() {
+      return new Response("Not found!");
+    },
+    websocket: {
+      data: {} as { userId: string; jobId: string },
+      async open(ws) {
+        console.log("Connection established");
+      },
+      message(ws, message) {
+        console.log("recvived", message);
+        ws.send("thanks men for using it ");
+      },
+      close(ws, code, reason) {
+        console.log("client closedd", code, reason);
+      },
+    },
+  });
 }
