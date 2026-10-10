@@ -2,6 +2,7 @@ import { type FastifyInstance } from "fastify";
 import { enqueue } from "./queue";
 import { searchId } from "./helper/search";
 import { prisma } from "../prisma/lib/prismaClient";
+import { rediss, subscriberRedis } from "./redis";
 
 const jobSchema = {
   schema: {
@@ -15,7 +16,6 @@ const jobSchema = {
     }
   }
 }
-
 
 type data = {
   data: {
@@ -44,6 +44,8 @@ export function jobRoutes(fastify: FastifyInstance) {
       YourJobs: allJobs,
     });
   });
+
+
   fastify.post("/job", jobSchema , async (req, res) => {
     try {
       const userId = req.headers["x-userid"] as string;
@@ -60,6 +62,7 @@ export function jobRoutes(fastify: FastifyInstance) {
       res.status(500).send(`Internal Server Error: ${err}`)
     }
   })
+
   fastify.get<{ Params: { id: string } }>("/job/:id", async (req, res) => {
     const userId = req.headers["x-userid"] as string;
     if (!userId) {
@@ -91,6 +94,7 @@ export function jobRoutes(fastify: FastifyInstance) {
       updatedAt: job.UpdatedAt,
     });
   });
+
   fastify.delete<{ Params: { id: string } }>(
     "/job/cancel/:id",
     async (req, res) => {
@@ -134,6 +138,7 @@ export function jobRoutes(fastify: FastifyInstance) {
           status: "CANCELLED",
         },
       });
+      await rediss.publish(`job-update:${updateJobStatus.id}`, "JOB CANCELLED")
       return res.status(200).send({
         msg: `CANCELLED job : ${updateJobStatus.id}`,
       });
@@ -161,26 +166,44 @@ export function jobRoutes(fastify: FastifyInstance) {
           data: {
             userId,
             jobId,
+            status: userCheck.status,
           },
         });
       },
     },
     port: Number(process.env.WS_PORT),
     fetch() {
-      return new Response("Not found!");
+      return new Response("Not found!")
     },
     websocket: {
-      data: {} as { userId: string; jobId: string },
-      async open(ws) {
-        console.log("Connection established");
+      data: {} as {
+        userId: string;
+        jobId: string;
+        status: string;
       },
-      message(ws, message) {
-        console.log("recvived", message);
-        ws.send("thanks men for using it ");
+      async open(ws) {
+        ws.send(ws.data.status);
+        if (ws.data.status === "COMPLETED") {
+          ws.close(1000, "job is COMPLETED");
+        }
+        await subscriberRedis.subscribe(
+          `job-update:${ws.data.jobId}`,
+          async (msg, channel) => {
+            ws.send(`Job status is ${msg}`);
+            const statusType = ["COMPLETED", "FAILED", "CANCELLED"];
+            if (statusType.includes(msg)) {
+              await rediss.unsubscribe(channel);
+              ws.close(1000, msg);
+            }
+          },
+        );
+      },
+      async message(ws, message) {
+        ws.send(`message received : ${message}`)
       },
       close(ws, code, reason) {
-        console.log("client closedd", code, reason);
+        ws.send(`connection is closed becuase ${reason}` + code);
       },
-    },
+    }
   });
 }

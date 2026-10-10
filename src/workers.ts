@@ -10,25 +10,27 @@ export async function worker() {
     );
     const JsonJob = JSON.parse(RemovedJob?.[1] as string);
 
-    await prisma.jobs.update({
-      where: {
-        id: JsonJob.id,
-      },
-      data: {
-        status: "ACTIVE",
-      },
-    });
-    console.log(`Job ${JsonJob?.id} is processing`);
-
     await new Promise((resolve) => setTimeout(resolve, 15000));
-    await prisma.jobs.update({
-      where: {
-        id: JsonJob.id,
-      },
-      data: {
-        status: "COMPLETED",
-      },
-    });
-    console.log(`Job ${JsonJob?.id} is COMPLETED`);
+       await prisma.jobs.update({
+         where: {
+           id: JsonJob.id,
+         },
+         data: {
+           status: "ACTIVE",
+         },
+       });
+
+       await rediss.publish(`job-update:${JsonJob.id}`, "ACTIVE");
+
+       await new Promise((resolve) => setTimeout(resolve, 15000));
+       await prisma.jobs.update({
+         where: {
+           id: JsonJob.id,
+         },
+         data: {
+           status: "COMPLETED",
+         },
+       });
+       await rediss.publish(`job-update:${JsonJob.id}`, "COMPLETED");
   }
 }
