@@ -8,10 +8,14 @@ const jobSchema = {
   schema: {
     body: {
       type: 'object',
+      required: ["data"],
       properties: {
-        jobType: { type: 'string' },
-        payload: { type: 'object' },
-        priority : {type: 'boolean' , default : false}
+        data: {
+          required: ["jobType", "payload"],
+          jobType: { type: "string" },
+          payload: { type: "object" },
+          priority: { type: "boolean", default: false },
+        }
       }
     }
   }
@@ -77,14 +81,16 @@ export function jobRoutes(fastify: FastifyInstance) {
       });
     }
     const job = await searchId(userId, id)
-    if (job?.userID != userId) {
-      return res.status(403).send({
-        error: "Wrong user id!",
-      });
-    }
+
     if (!job) {
       return res.status(404).send({
         error: "job id is wrong!",
+      });
+    }
+
+    if (job?.userID != userId) {
+      return res.status(403).send({
+        error: "Wrong user id!",
       });
     }
     return res.status(200).send({
@@ -133,6 +139,7 @@ export function jobRoutes(fastify: FastifyInstance) {
       const updateJobStatus = await prisma.jobs.update({
         where: {
           id: id,
+          status: "QUEUED"
         },
         data: {
           status: "CANCELLED",
@@ -162,13 +169,21 @@ export function jobRoutes(fastify: FastifyInstance) {
             { status: 404 },
           );
         }
-        server.upgrade(req, {
+        const success = server.upgrade(req, {
           data: {
             userId,
             jobId,
             status: userCheck.status,
           },
         });
+        if (success) return;
+
+        Response.json(
+          {
+            msg: "upgrading websocket FAILED",
+          },
+          { status: 505 },
+        )
       },
     },
     port: Number(process.env.WS_PORT),
@@ -182,17 +197,18 @@ export function jobRoutes(fastify: FastifyInstance) {
         status: string;
       },
       async open(ws) {
+        const statusType = ["COMPLETED", "FAILED", "CANCELLED"];
         ws.send(ws.data.status);
-        if (ws.data.status === "COMPLETED") {
+        if (statusType.includes(ws.data.status)) {
           ws.close(1000, "job is COMPLETED");
         }
         await subscriberRedis.subscribe(
           `job-update:${ws.data.jobId}`,
           async (msg, channel) => {
             ws.send(`Job status is ${msg}`);
-            const statusType = ["COMPLETED", "FAILED", "CANCELLED"];
+            ws.close(1000)
             if (statusType.includes(msg)) {
-              await rediss.unsubscribe(channel);
+              await subscriberRedis.unsubscribe(channel);
               ws.close(1000, msg);
             }
           },
@@ -201,8 +217,8 @@ export function jobRoutes(fastify: FastifyInstance) {
       async message(ws, message) {
         ws.send(`message received : ${message}`)
       },
-      close(ws, code, reason) {
-        ws.send(`connection is closed becuase ${reason}` + code);
+      async close(ws, code, reason) {
+        await subscriberRedis.unsubscribe(`job-update:${ws.data.jobId}`);
       },
     }
   });
