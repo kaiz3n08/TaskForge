@@ -11,15 +11,18 @@ const jobSchema = {
       required: ["data"],
       properties: {
         data: {
+          type: "object",
           required: ["jobType", "payload"],
-          jobType: { type: "string" },
-          payload: { type: "object" },
-          priority: { type: "boolean", default: false },
-        }
-      }
-    }
-  }
-}
+          properties: {
+            jobType: { type: "string" },
+            payload: { type: "object" },
+            priority: { type: "boolean", default: false },
+          },
+        },
+      },
+    },
+  },
+};
 
 type data = {
   data: {
@@ -174,6 +177,7 @@ export function jobRoutes(fastify: FastifyInstance) {
             userId,
             jobId,
             status: userCheck.status,
+            subscribed: false
           },
         });
         if (success) return;
@@ -195,6 +199,7 @@ export function jobRoutes(fastify: FastifyInstance) {
         userId: string;
         jobId: string;
         status: string;
+        subscribed: boolean
       },
       async open(ws) {
         const statusType = ["COMPLETED", "FAILED", "CANCELLED"];
@@ -204,21 +209,27 @@ export function jobRoutes(fastify: FastifyInstance) {
         }
         await subscriberRedis.subscribe(
           `job-update:${ws.data.jobId}`,
-          async (msg, channel) => {
+          (msg) => {
             ws.send(`Job status is ${msg}`);
-            ws.close(1000)
             if (statusType.includes(msg)) {
-              await subscriberRedis.unsubscribe(channel);
               ws.close(1000, msg);
             }
           },
         );
+        ws.data.subscribed = true;
       },
       async message(ws, message) {
         ws.send(`message received : ${message}`)
       },
-      async close(ws, code, reason) {
-        await subscriberRedis.unsubscribe(`job-update:${ws.data.jobId}`);
+      async close(ws) {
+        try {
+          if (ws.data.subscribed) {
+            ws.data.subscribed = false;
+            await subscriberRedis.unsubscribe(`job-update:${ws.data.jobId}`);
+          }
+        } catch (err) {
+          console.error(`err ${err}`);
+        }
       },
     }
   });
